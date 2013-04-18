@@ -4,7 +4,8 @@ import sys, getopt
 from tables import *
 import datetime
 import re
-from operator import itemgetter
+from operator import itemgetter, attrgetter
+from itertools import groupby
 
 
 def main(argv, scriptname='unknkown'):
@@ -37,6 +38,9 @@ class FirewallEntry(IsDescription):
     dest        = StringCol(15)
     dest_port   = UInt16Col()
     protocol    = EnumCol( enum=Enum( {'tcp': 1L, 'udp': 0L} ), dflt='tcp', base='uint8' )
+
+class IP(IsDescription):
+    ip         = StringCol(15)
     
 
 def extractIp( inputfilename, outputfilename ):
@@ -50,7 +54,7 @@ def extractIp( inputfilename, outputfilename ):
     group = outputfile.getNode( '/', 'firewallLogs', classname='Group' )
 
   try:
-    table = outputfile.createTable( group, 'firewallEntries', FirewallEntry, 'Source IPs from firewall logs' )
+    table = outputfile.createTable( group, 'firewallEntries', FirewallEntry )
   except NodeError:
     table = outputfile.getNode( group, 'firewallEntries', classname='Table' )
 
@@ -73,7 +77,21 @@ def extractIp( inputfilename, outputfilename ):
         entry['dest'] = tokens[0]
         entry['dest_port'] = int(tokens[1])
 
+    entry.append()
+
   inputfile.close()
+
+  table.flush()
+  try:
+    table_unique = outputfile.createTable( group, 'Unique IPs', IP )
+  except NodeError:
+    table_unique = outputfile.getNode( group, 'Unique IPs', classname="Table" )
+
+  for ip, set in groupby( table, key=itemgetter('src') ):
+    entry = table_unique.row
+    entry['ip'] = ip
+    entry.append()
+
   outputfile.close()
 
 
