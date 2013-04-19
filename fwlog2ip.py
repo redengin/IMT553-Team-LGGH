@@ -32,7 +32,8 @@ def main(argv, scriptname='unknkown'):
 
 
 class FirewallEntry(IsDescription):
-    date        = StringCol(20)
+    line        = UInt64Col()
+    date        = Time64Col(20)
     src         = StringCol(15)
     src_port    = UInt16Col()
     dest        = StringCol(15)
@@ -55,9 +56,9 @@ def extractIp( inputfilename, outputfilename ):
 
   try:
     table = outputfile.createTable( group, 'firewallEntries', FirewallEntry )
+    table.cols.src.createCSIndex( );
   except NodeError:
     table = outputfile.getNode( group, 'firewallEntries', classname='Table' )
-
 
   r = re.compile( '(\w+)=("[^"]*"|\S+)' )
   inputfile = open( inputfilename )
@@ -76,18 +77,25 @@ def extractIp( inputfilename, outputfilename ):
         tokens = (v.split(':'))
         entry['dest'] = tokens[0]
         entry['dest_port'] = int(tokens[1])
-
+    entry['line'] = linecount
     entry.append()
 
   inputfile.close()
 
   table.flush()
-  try:
-    table_unique = outputfile.createTable( group, 'Unique IPs', IP )
-  except NodeError:
-    table_unique = outputfile.getNode( group, 'Unique IPs', classname="Table" )
 
-  for ip, set in groupby( table, key=itemgetter('src') ):
+  # sort the table
+  table_sorted = table.copy( newparent=group, newname='SortedIPs', overwrite=True, sortby='src' );
+
+  table_sorted.flush();
+
+
+  try:
+    table_unique = outputfile.createTable( group, 'UniqueIPs', IP )
+  except NodeError:
+    table_unique = outputfile.getNode( group, 'UniqueIPs', classname="Table" )
+
+  for ip, set in groupby( table_sorted, key=itemgetter('src') ):
     entry = table_unique.row
     entry['ip'] = ip
     entry.append()
