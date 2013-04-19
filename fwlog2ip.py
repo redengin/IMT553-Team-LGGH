@@ -54,11 +54,15 @@ def extractIp( inputfilename, outputfilename ):
   except NodeError:
     group = outputfile.getNode( '/', 'firewallLogs', classname='Group' )
 
+  compressFilter = Filters( complevel=5, fletcher32=False )
   try:
-    table = outputfile.createTable( group, 'firewallEntries', FirewallEntry )
+    table = outputfile.createTable( group, 'firewallEntries', FirewallEntry, filters=compressFilter )
     table.cols.src.createCSIndex( );
   except NodeError:
     table = outputfile.getNode( group, 'firewallEntries', classname='Table' )
+    table.remove()
+    table = outputfile.createTable( group, 'firewallEntries', FirewallEntry, filters=compressFilter )
+    table.cols.src.createCSIndex( );
 
   r = re.compile( '(\w+)=("[^"]*"|\S+)' )
   inputfile = open( inputfilename )

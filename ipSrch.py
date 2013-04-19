@@ -9,6 +9,7 @@ import re
 from operator import itemgetter, attrgetter
 from itertools import groupby
 import xml.sax
+import unicodedata
 
 
 def main(argv, scriptname='unknkown'):
@@ -53,12 +54,13 @@ def searchIP( inputfilename, dbfilename ):
   except NodeError:
     group = dbfile.getNode( '/', 'wikipedia', classname='Group' )
 
+  compressFilter = Filters( complevel=5, fletcher32=False )
   try:
-    table = dbfile.createTable( group, re.sub('-|\.','_',basename(inputfilename)), Revision )
+    table = dbfile.createTable( group, re.sub('-|\.','_',basename(inputfilename)), Revision, filters=compressFilter )
   except NodeError:
     table = dbfile.getNode( group, re.sub('-|\.','_',basename(inputfilename)), classname='Table' )
     table.remove()
-    table = dbfile.createTable( group, re.sub('-|\.','_',basename(inputfilename)), Revision )
+    table = dbfile.createTable( group, re.sub('-|\.','_',basename(inputfilename)), Revision, filters=compressFilter )
 
   fwgroup = dbfile.getNode( '/', 'firewallLogs', classname='Group' )
   iptable = dbfile.getNode( fwgroup, 'UniqueIPs', classname='Table' )
@@ -89,7 +91,9 @@ def searchIP( inputfilename, dbfilename ):
         else: self.state = None
 
     def characters( self, text ):
-        if( self.state != None ): self.target.send( (self.state, text) )
+        if( self.state != None ):
+            nonUni = unicodedata.normalize('NFKD', text).encode('ascii','ignore')
+            self.target.send( (self.state, nonUni) )
 
     def endElement( self, name ):
         self.state = None
@@ -110,13 +114,13 @@ def searchIP( inputfilename, dbfilename ):
         if( event[0] == 'id' ): id = event[1]
         if( event[0] == 'timestamp' ): timestamp = event[1]
         if( event[0] == 'ip' ):
-            revision.append()
-            revision = table.row
             revision['title'] = title
             revision['id'] = id
             revision['timestamp'] = timestamp
             for row in iptable.where( 'ip == "' + event[1] + '"' ):
               print title + ' ' + event[1]
+              revision.append()
+              revision = table.row
               break
 
   infile = gzip.GzipFile( inputfilename )
