@@ -96,8 +96,13 @@ def extractIp( inputfilename, outputfilename ):
 
   try:
     table_unique = outputfile.createTable( group, 'UniqueIPs', IP )
+    table_unique.cols.ip.createCSIndex( );
   except NodeError:
     table_unique = outputfile.getNode( group, 'UniqueIPs', classname="Table" )
+    table_unique.remove()
+    table_unique = outputfile.createTable( group, 'UniqueIPs', IP )
+    table_unique.cols.ip.createCSIndex( );
+
 
   for ip, set in groupby( table_sorted, key=itemgetter('src') ):
     entry = table_unique.row
